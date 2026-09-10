@@ -1,0 +1,123 @@
+services:
+
+  postgres:
+    image: postgres:17
+    container_name: voiceforge-postgres
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  eureka-server:
+    build: ./eureka-server
+
+    container_name: eureka-server
+
+    ports:
+      - "8761:8761"
+
+    depends_on:
+      - postgres
+
+  auth-service:
+    build: ./auth-service
+
+    container_name: auth-service
+
+    ports:
+      - "8081:8081"
+
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/voiceforge
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      EUREKA_URL: http://eureka-server:8761/eureka/
+
+    depends_on:
+      - postgres
+      - eureka-server
+
+  user-service:
+    build: ./user-service
+
+    container_name: user-service
+
+    ports:
+      - "8082:8082"
+
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/voiceforge_user
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      EUREKA_URL: http://eureka-server:8761/eureka/
+
+    depends_on:
+      - postgres
+      - eureka-server
+
+  history-service:
+    build: ./history-service
+
+    container_name: history-service
+
+    ports:
+      - "8084:8084"
+
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/voiceforge_history
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      EUREKA_URL: http://eureka-server:8761/eureka/
+
+    depends_on:
+      - postgres
+      - eureka-server
+
+  voice-service:
+    build: ./voice-service
+
+    container_name: voice-service
+
+    ports:
+      - "8083:8083"
+
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+
+    depends_on:
+      - auth-service
+      - user-service
+      - history-service
+      - eureka-server
+
+  api-gateway:
+    build: ./api-gateway
+
+    container_name: api-gateway
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      EUREKA_URL: http://eureka-server:8761/eureka/
+
+    depends_on:
+      - auth-service
+      - user-service
+      - history-service
+      - voice-service
+      - eureka-server
+
+
+volumes:
+  postgres_data:
